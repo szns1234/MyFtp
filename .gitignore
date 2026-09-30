@@ -1,0 +1,36 @@
+# 本地服务器配置、同步日志、快照（含账号密码，禁止提交）
+myftp/
+config.json
+sync_log.json
+
+# 含真实主机和密码的临时测试
+_real_test.py
+_ftp_test_file.txt
+_local_for_ftp.txt
+_stor_result.txt
+
+# 运行输出
+run_stdout*.txt
+run_stderr*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 打包产物
+build/
+dist/
+*.exe
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 发布过程临时文件
+docs/.gh-device.json
+docs/wechat-login.png
