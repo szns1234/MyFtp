@@ -24,6 +24,22 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## 一键打包
+
+Windows 上可以打成单个可执行文件，不用先安装 Python：
+
+```bash
+py build_exe.py
+```
+
+脚本会自动检查并安装 PyInstaller，清理旧的 `build/`、`dist/`，然后生成无控制台窗口的 `dist/MyFtp.exe`。
+
+只清理构建产物、不重新打包：
+
+```bash
+py build_exe.py --clean
+```
+
 ## 使用流程
 
 ### 1. 添加服务器
