@@ -26,13 +26,15 @@ python main.py
 
 ## 一键打包
 
-Windows 上可以打成单个可执行文件，不用先安装 Python：
+打包的电脑需要先安装 Python 3.8 及以上。`py build_exe.py` 是给开发者用的，不能在没装 Python 的电脑上运行。
 
 ```bash
 py build_exe.py
 ```
 
 脚本会自动检查并安装 PyInstaller，清理旧的 `build/`、`dist/`，然后生成无控制台窗口的 `dist/MyFtp.exe`。
+
+不用安装 Python 的是拿到这个 exe 的人：双击即可运行，Python 已经打进程序里。
 
 只清理构建产物、不重新打包：
 
