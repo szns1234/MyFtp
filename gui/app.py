@@ -565,12 +565,14 @@ class App:
         self._restore_combo_text()
 
     def _on_server_combo_select(self, event=None):
-        """下拉框选择服务器 - 自动断开旧连接，启用自动扫描并按需启动"""
+        """下拉框选择服务器 - 自动断开旧连接，切换到新服务器并加载其文件。"""
         name = self.server_select_var.get()
-        # 切换服务器时，若已连接则先异步断开
+        # 同步更新下载页顶部显示的当前服务器
+        self._update_download_server_display()
+        # 切换服务器时，若已连接则先异步断开，断开后自动连接新服务器
         if self.ftp.is_connected:
             self._set_download_buttons_state(False, busy=True)
-            self._show_download_wait("正在断开旧连接")
+            self._show_download_wait("正在切换服务器")
 
             def _do_switch_disconnect():
                 try:
@@ -580,9 +582,16 @@ class App:
                 self.root.after(0, self._close_download_wait)
                 self.root.after(0, lambda: self.download_tree.delete(*self.download_tree.get_children()))
                 self.root.after(0, lambda: self._set_download_buttons_state(False))
-                self.root.after(0, lambda: self._set_status("已断开旧连接，可连接新服务器"))
+                # 选中了新服务器则自动连接并加载文件，否则仅提示
+                if name:
+                    self.root.after(0, self._download_connect)
+                else:
+                    self.root.after(0, lambda: self._set_status("已断开连接"))
 
             threading.Thread(target=_do_switch_disconnect, daemon=True).start()
+        elif name:
+            # 之前未连接，直接连上新选的服务器并加载文件
+            self._download_connect()
 
         if name:
             self.auto_scan_cb.config(state="normal")

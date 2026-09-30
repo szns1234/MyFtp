@@ -100,15 +100,22 @@ class FileMonitor:
             self._auto_monitor = False  # 一次性扫描，不是自动模式
             self._monitored_name = name
 
-            # 执行扫描（不启动定时器）
-            self._do_scan_work(name)
+            # 执行扫描（不启动定时器）。手动刷新时，若从未同步过则全量列出
+            self._do_scan_work(name, include_all_when_never_synced=True)
 
             msg = f"扫描完成: {name}"
             self._notify(name, "scan_once", "", msg)
             return True, msg
 
-    def _do_scan_work(self, name):
-        """执行扫描工作的公共方法（start 和 scan_once 共用）"""
+    def _do_scan_work(self, name, include_all_when_never_synced=False):
+        """执行扫描工作的公共方法（start 和 scan_once 共用）
+
+        Args:
+            include_all_when_never_synced: 从未同步过（无 last_sync）时，是否把
+                本地所有未排除文件都列为待上传。手动点「刷新扫描」传 True，
+                这样新服务器扫一次就能看到全部文件；自动扫描保持 False，
+                避免首次勾选就全量列出。
+        """
         # 清空待上传列表
         with self._pending_lock:
             self._pending.clear()
@@ -120,7 +127,7 @@ class FileMonitor:
         exclude_patterns = self.config.get_exclude_patterns(name)
 
         # 基于修改时间扫描待上传文件（捕获停止期间的变更）
-        self._scan_by_mtime()
+        self._scan_by_mtime(include_all_when_never_synced=include_all_when_never_synced)
 
         # 检测删除的文件（旧快照中有，但当前文件系统中已不存在）
         self._detect_deleted_files()
@@ -623,10 +630,13 @@ class FileMonitor:
         if parts:
             self._notify(self._monitored_name, "scan", "", "检测到变更: " + "，".join(parts))
 
-    def _scan_by_mtime(self):
+    def _scan_by_mtime(self, include_all_when_never_synced=False):
         """基于修改时间扫描本地目录，将修改时间晚于上次同步时间的文件添加到待上传列表。
 
-        如果从未同步过（last_sync 为 None），则不添加任何文件（首次启动不应全量上传）。
+        如果从未同步过（last_sync 为 None）：
+          · include_all_when_never_synced=False：不添加任何文件（自动扫描首次不全量上传）；
+          · include_all_when_never_synced=True：把本地所有未排除文件都列为待上传
+            （手动点「刷新扫描」时，让新服务器扫一次就能看到全部文件）。
         """
         if not self._monitored_name:
             return
@@ -654,8 +664,11 @@ class FileMonitor:
             except Exception:
                 last_sync = None
 
-        # 如果从未同步过，不添加任何文件（避免首次启动全量上传）
-        if not last_sync:
+        # 从未同步过时的处理：
+        #   · 手动刷新（include_all_when_never_synced=True）→ 全量列出，不按 last_sync 过滤
+        #   · 自动扫描（False）→ 不添加任何文件（避免首次启动全量上传）
+        never_synced = not last_sync
+        if never_synced and not include_all_when_never_synced:
             return
 
         # 获取已存在的 pending 路径，避免重复添加
@@ -687,8 +700,9 @@ class FileMonitor:
                 except Exception:
                     continue
 
-                # 只添加修改时间晚于上次同步的文件
-                if mtime_dt <= last_sync:
+                # 已同步过：只添加修改时间晚于上次同步的文件
+                # 从未同步且要求全量：不按时间过滤，全部列出
+                if not never_synced and mtime_dt <= last_sync:
                     continue
 
                 # 计算相对路径和远程路径
@@ -698,13 +712,13 @@ class FileMonitor:
                 if not remote.startswith("/"):
                     remote = "/" + remote
 
-                # 添加到待上传列表
+                # 添加到待上传列表：从未同步的全量列出记为 create，其余为 modify
                 mtime_str = mtime_dt.strftime("%m-%d %H:%M:%S")
                 with self._pending_lock:
                     self._pending[file_path] = {
                         "rel": rel,
                         "remote": remote,
-                        "action": "modify",
+                        "action": "create" if never_synced else "modify",
                         "time": mtime_str,
                     }
                 existing_paths.add(file_path)
